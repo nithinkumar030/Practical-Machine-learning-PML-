@@ -1,0 +1,142 @@
+#Practical Machine Learning assignment
+
+#Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively.
+#These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior,or because  they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it.  
+#The goal of your project is to predict the manner in which they did the exercise. This is the "classe" variable in the training set. You may use any of the other variables to predict with.
+
+
+#Load libraries  
+
+```{r load library}
+
+
+library(caret)
+library(randomForest)
+library(corrplot)
+```
+
+#Download the training Data
+
+```{r load training data}
+trainingLink <-"https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+trainingData <- "./pml-training.csv"
+download.file(trainingLink,destfile=trainingData, method="curl")
+```
+
+
+#Download the testing Data
+
+
+```{r load testing data}
+testingLink <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+testingData  <- "./pml-testing.csv"
+download.file(testingLink, destfile=testingData, method="curl")
+
+```
+
+#Read the Data into dataframes
+
+
+```{r read data}
+ 
+trainingDf <- read.csv("./pml-training.csv")
+testingDf <- read.csv("./pml-testing.csv")
+```
+
+#Data Cleaning
+
+
+```{r clean data}
+
+trainingDf <- trainingDf[, colSums(is.na(trainingDf)) == 0] 
+testingDf <- testingDf[, colSums(is.na(testingDf)) == 0] 
+
+#Clean the training Df with unwanted columns like containing timestamp or window.
+
+#save the classe which is not a numeric type 
+classe <- trainingDf$classe
+
+trainFilter <- grepl("^X|timestamp|window", names(trainingDf))
+trainingDf <- trainingDf[, !trainFilter]
+
+#select only numeric values 
+cleanedTrainingDf <- trainingDf[, sapply(trainingDf, is.numeric)]
+
+#restore classe in training set
+cleanedTrainingDf$classe <- classe
+
+
+#Clean the testing Df with unwanted columns like containing timestamp or window.
+
+testingFilter <- grepl("^X|timestamp|window", names(testingDf))
+
+testingDf <- testingDf[, !testingFilter]
+
+cleanedTestingDf <- testingDf[, sapply(testingDf, is.numeric)]
+
+```
+
+
+#Split the cleaned training set into training data set (70%)
+#and a validation data set (30%). 
+#We will use the validation data set to conduct cross validation in future steps.  
+
+```{r model and predict test data}
+
+set.seed(310021) # Set the seed for reproducible purposes.
+# divide into training and test set
+trainSet <- createDataPartition(cleanedTrainingDf$classe, p=0.70, list=F)
+
+trainDataFrame <- cleanedTrainingDf[trainSet, ]
+testDataFrame <- cleanedTrainingDf[-trainSet, ]
+
+
+#Model selection
+# using Random Forest model algorithm because it automatically selects important variables
+#and is less vulnerable to outliers.Lets use a 6 fold cross validation.  
+
+trControlRf <- trainControl(method="cv", 6)
+
+model <- train(classe ~ ., data=trainDataFrame, method="rf", trControl=trControlRf, ntree=360)
+
+#Then, we estimate the performance of the model on the test data set.  
+
+predict <- predict(model, testDataFrame)
+confusionMatrix(testDataFrame$classe, predict)
+
+
+accuracy <- postResample(predict, testDataFrame$classe)
+
+print("accuracy:")
+print(accuracy)
+
+outOfSampleError <- 1 - as.numeric(confusionMatrix(testDataFrame$classe, predict)$overall[1])
+
+print("outOfSampleError:")
+print(outOfSampleError)
+```
+
+#Apply to the real test data to predict
+
+```{r predict real test data}
+
+result <- predict(model, cleanedTestingDf[, -length(names(cleanedTestingDf))])
+print("result:")
+print(result)
+```
+
+
+#Displaying the Correlation Matrix 
+
+```{r print corr plot,echo=FALSE}
+
+ 
+
+cPlot <- cor(trainDataFrame[, -length(names(trainDataFrame))])
+corrplot(cPlot, method="color")
+```
+
+
+
+
+
